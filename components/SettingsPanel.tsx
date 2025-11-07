@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import type { AppSettings } from '../types';
@@ -236,7 +235,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             
             <Section title="الأقسام والكتب (JSON)">
                 <p className="text-sm text-slate-400 mb-4">
-                    يمكنك تعديل الأقسام والكتب مباشرة هنا. أضف `"adUrl": "رابط الإعلان"` داخل أي كتاب لتخصيص إعلانه.
+                   يمكنك تعديل الأقسام والكتب. كل كتاب يحتوي على مصفوفة 'parts'. كل جزء له 'id', 'title', 'adUrl', و 'content'.
                 </p>
                 <textarea dir="ltr" className="w-full h-96 p-3 bg-slate-900 border border-slate-600 rounded-md text-green-300 font-mono focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none" value={categoriesJson} onChange={(e) => setCategoriesJson(e.target.value)} />
             </Section>

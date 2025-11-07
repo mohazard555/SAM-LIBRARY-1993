@@ -1,11 +1,16 @@
+export interface ContentPart {
+  id: string;
+  title: string;
+  adUrl: string;
+  content: string;
+}
 
 export interface Book {
   id: string;
   title: string;
   author: string;
   coverColor: string;
-  content: string;
-  adUrl?: string; // Each book can have a specific ad URL
+  parts: ContentPart[];
 }
 
 export interface Category {

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import Header from './components/Header';
@@ -8,61 +7,48 @@ import AdModal from './components/AdModal';
 import BookViewer from './components/BookViewer';
 import SettingsPanel from './components/SettingsPanel';
 import AboutModal from './components/AboutModal';
-import type { Book, Category } from './types';
-
-const PromotionalAdSection: React.FC = () => {
-    const { settings } = useSettings();
-    if (!settings.promotionalAds || settings.promotionalAds.length === 0) {
-        return null;
-    }
-
-    return (
-        <section className="mb-10">
-            <h2 className={`text-3xl font-bold mb-6 flex items-center gap-3 ${settings.colors.secondary}`}>
-                <span>📢</span>
-                عروض خاصة
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {settings.promotionalAds.map(ad => (
-                    <a key={ad.id} href={ad.linkUrl} target="_blank" rel="noopener noreferrer" className="bg-slate-800 rounded-lg overflow-hidden group transition-transform transform hover:scale-105">
-                        <img src={ad.imageUrl} alt={ad.title} className="w-full h-48 object-cover" />
-                        <div className="p-4">
-                            <h3 className="font-bold text-lg text-amber-400">{ad.title}</h3>
-                            <p className="text-slate-400 text-sm">{ad.description}</p>
-                        </div>
-                    </a>
-                ))}
-            </div>
-        </section>
-    )
-}
-
+import PromotionsModal from './components/PromotionsModal';
+import ContentPickerModal from './components/ContentPickerModal';
+import type { Book, Category, ContentPart } from './types';
 
 const AppContent: React.FC = () => {
   const { settings } = useSettings();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [bookToRead, setBookToRead] = useState<Book | null>(null);
+  const [isPromotionsOpen, setIsPromotionsOpen] = useState(false);
+  const [bookForContentPicking, setBookForContentPicking] = useState<Book | null>(null);
+  const [partForAd, setPartForAd] = useState<{ part: ContentPart; book: Book } | null>(null);
+  const [partToRead, setPartToRead] = useState<{ part: ContentPart; book: Book } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const handleBookSelect = (book: Book) => {
-    setSelectedBook(book);
+    if (book.parts.length === 1) {
+      setPartForAd({ part: book.parts[0], book });
+    } else {
+      setBookForContentPicking(book);
+    }
+  };
+
+  const handlePartSelect = (part: ContentPart) => {
+    if (bookForContentPicking) {
+      setPartForAd({ part, book: bookForContentPicking });
+    }
+    setBookForContentPicking(null);
   };
 
   const closeAdModal = () => {
-    setSelectedBook(null);
+    setPartForAd(null);
   };
 
   const handleAdFinished = () => {
-    if (selectedBook) {
-        setBookToRead(selectedBook);
+    if (partForAd) {
+      setPartToRead(partForAd);
     }
-    setSelectedBook(null);
+    setPartForAd(null);
   };
   
   const closeBookViewer = () => {
-    setBookToRead(null);
+    setPartToRead(null);
   };
   
   const filteredCategories = useMemo(() => {
@@ -82,7 +68,11 @@ const AppContent: React.FC = () => {
 
   return (
     <div className={`${settings.colors.background} ${settings.colors.text} min-h-screen font-['Cairo'] transition-colors duration-500`}>
-      <Header onSettingsClick={() => setIsSettingsOpen(true)} onAboutClick={() => setIsAboutOpen(true)} />
+      <Header 
+        onSettingsClick={() => setIsSettingsOpen(true)} 
+        onAboutClick={() => setIsAboutOpen(true)}
+        onPromotionsClick={() => setIsPromotionsOpen(true)}
+      />
       
       <main className="container mx-auto px-6 md:px-10 py-8">
         <div className="mb-8 max-w-2xl mx-auto">
@@ -95,8 +85,6 @@ const AppContent: React.FC = () => {
             />
         </div>
 
-        <PromotionalAdSection />
-
         {filteredCategories.length > 0 ? filteredCategories.map(category => (
           <CategorySection key={category.id} category={category} onBookSelect={handleBookSelect} />
         )) : (
@@ -108,16 +96,34 @@ const AppContent: React.FC = () => {
       
       <Footer />
       
-      {selectedBook && (
-        <AdModal book={selectedBook} onClose={closeAdModal} onAdFinished={handleAdFinished} />
+      {bookForContentPicking && (
+        <ContentPickerModal
+          book={bookForContentPicking}
+          onClose={() => setBookForContentPicking(null)}
+          onPartSelect={handlePartSelect}
+        />
+      )}
+
+      {partForAd && (
+        <AdModal 
+          part={partForAd.part}
+          bookTitle={partForAd.book.title}
+          onClose={closeAdModal} 
+          onAdFinished={handleAdFinished} 
+        />
       )}
       
-      {bookToRead && (
-        <BookViewer book={bookToRead} onClose={closeBookViewer} />
+      {partToRead && (
+        <BookViewer 
+          book={{ title: partToRead.book.title, author: partToRead.book.author }}
+          part={partToRead.part}
+          onClose={closeBookViewer} 
+        />
       )}
 
       {isSettingsOpen && <SettingsPanel onClose={() => setIsSettingsOpen(false)} />}
       {isAboutOpen && <AboutModal onClose={() => setIsAboutOpen(false)} />}
+      {isPromotionsOpen && <PromotionsModal onClose={() => setIsPromotionsOpen(false)} />}
     </div>
   );
 };

@@ -1,26 +1,83 @@
-
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import type { AppSettings } from '../types';
 
 const initialBooks = {
   arabic: [
-    { id: 'ar1', title: 'ثلاثية غرناطة', author: 'رضوى عاشور', coverColor: 'bg-teal-100', content: 'محتوى رواية ثلاثية غرناطة...', adUrl: 'https://example.com/custom-ad-1' },
-    { id: 'ar2', title: 'أولاد حارتنا', author: 'نجيب محفوظ', coverColor: 'bg-amber-100', content: 'محتوى رواية أولاد حارتنا...' },
+    { 
+      id: 'ar1', 
+      title: 'ثلاثية غرناطة', 
+      author: 'رضوى عاشور', 
+      coverColor: 'bg-teal-100', 
+      parts: [
+        { id: 'ar1p1', title: 'الجزء الأول: غرناطة', adUrl: 'https://example.com/ad-granada', content: 'محتوى الجزء الأول من رواية ثلاثية غرناطة...' },
+        { id: 'ar1p2', title: 'الجزء الثاني: مريمة', adUrl: 'https://example.com/ad-mariam', content: 'محتوى الجزء الثاني...' },
+        { id: 'ar1p3', title: 'الجزء الثالث: الرحيل', adUrl: 'https://example.com/ad-departure', content: 'محتوى الجزء الثالث...' },
+      ] 
+    },
+    { 
+      id: 'ar2', 
+      title: 'أولاد حارتنا', 
+      author: 'نجيب محفوظ', 
+      coverColor: 'bg-amber-100', 
+      parts: [
+        { id: 'ar2p1', title: 'قراءة الرواية', adUrl: '', content: 'محتوى رواية أولاد حارتنا...' }
+      ]
+    },
   ],
   world: [
-    { id: 'en1', title: 'مئة عام من العزلة', author: 'غابرييل غارسيا ماركيز', coverColor: 'bg-purple-100', content: 'محتوى رواية مئة عام من العزلة...' },
+    { 
+      id: 'en1', 
+      title: 'مئة عام من العزلة', 
+      author: 'غابرييل غارسيا ماركيز', 
+      coverColor: 'bg-purple-100', 
+      parts: [
+        { id: 'en1p1', title: 'قراءة الرواية', adUrl: '', content: 'محتوى رواية مئة عام من العزلة...' }
+      ]
+    },
   ],
   children: [
-    { id: 'ch1', title: 'مغامرات سندباد', author: 'تراث', coverColor: 'bg-green-100', content: 'محتوى قصة مغامرات سندباد...' },
+    { 
+      id: 'ch1', 
+      title: 'مغامرات سندباد', 
+      author: 'تراث', 
+      coverColor: 'bg-green-100', 
+      parts: [
+        { id: 'ch1p1', title: 'قراءة القصة', adUrl: '', content: 'محتوى قصة مغامرات سندباد...' }
+      ] 
+    },
   ],
   romance: [
-    { id: 'ro1', title: 'كبرياء وهوى', author: 'جين أوستن', coverColor: 'bg-pink-100', content: 'محتوى رواية كبرياء وهوى...' },
+    { 
+      id: 'ro1', 
+      title: 'كبرياء وهوى', 
+      author: 'جين أوستن', 
+      coverColor: 'bg-pink-100', 
+      parts: [
+        { id: 'ro1p1', title: 'قراءة الرواية', adUrl: '', content: 'محتوى رواية كبرياء وهوى...' }
+      ]
+    },
   ],
   mystery: [
-    { id: 'my1', title: 'جريمة في قطار الشرق', author: 'أجاثا كريستي', coverColor: 'bg-gray-200', content: 'محتوى رواية جريمة في قطار الشرق...' },
+    { 
+      id: 'my1', 
+      title: 'جريمة في قطار الشرق', 
+      author: 'أجاثا كريستي', 
+      coverColor: 'bg-gray-200', 
+      parts: [
+        { id: 'my1p1', title: 'قراءة الرواية', adUrl: '', content: 'محتوى رواية جريمة في قطار الشرق...' }
+      ]
+    },
   ],
   dev: [
-    { id: 'dv1', title: 'العادات السبع للناس الأكثر فعالية', author: 'ستيفن كوفي', coverColor: 'bg-sky-100', content: 'محتوى كتاب العادات السبع...' },
+    { 
+      id: 'dv1', 
+      title: 'العادات السبع للناس الأكثر فعالية', 
+      author: 'ستيفن كوفي', 
+      coverColor: 'bg-sky-100', 
+      parts: [
+        { id: 'dv1p1', title: 'قراءة الكتاب', adUrl: '', content: 'محتوى كتاب العادات السبع...' }
+      ]
+    },
   ],
 };
 
