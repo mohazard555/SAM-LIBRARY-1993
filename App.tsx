@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import Header from './components/Header';
@@ -12,7 +13,7 @@ import ContentPickerModal from './components/ContentPickerModal';
 import type { Book, Category, ContentPart } from './types';
 
 const AppContent: React.FC = () => {
-  const { settings } = useSettings();
+  const { settings, setSettings } = useSettings();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isPromotionsOpen, setIsPromotionsOpen] = useState(false);
@@ -22,6 +23,19 @@ const AppContent: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleBookSelect = (book: Book) => {
+    // Increment click count and save to state and localStorage
+    setSettings(prevSettings => {
+        const newCategories = prevSettings.categories.map(category => ({
+            ...category,
+            books: category.books.map(b => 
+                b.id === book.id ? { ...b, clickCount: (b.clickCount || 0) + 1 } : b
+            )
+        }));
+        const newSettings = { ...prevSettings, categories: newCategories };
+        localStorage.setItem('librarySettings', JSON.stringify(newSettings));
+        return newSettings;
+    });
+
     if (book.parts.length === 1) {
       setPartForAd({ part: book.parts[0], book });
     } else {

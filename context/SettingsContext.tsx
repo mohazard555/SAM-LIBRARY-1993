@@ -1,4 +1,5 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type { AppSettings } from '../types';
 
 const initialBooks = {
@@ -8,6 +9,7 @@ const initialBooks = {
       title: 'ثلاثية غرناطة', 
       author: 'رضوى عاشور', 
       coverColor: 'bg-teal-100', 
+      clickCount: 0,
       parts: [
         { id: 'ar1p1', title: 'الجزء الأول: غرناطة', watchUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', adUrl: 'https://example.com/ad-granada', content: 'محتوى الجزء الأول من رواية ثلاثية غرناطة...' },
         { id: 'ar1p2', title: 'الجزء الثاني: مريمة', adUrl: 'https://example.com/ad-mariam', content: 'محتوى الجزء الثاني...' },
@@ -19,6 +21,7 @@ const initialBooks = {
       title: 'أولاد حارتنا', 
       author: 'نجيب محفوظ', 
       coverColor: 'bg-amber-100', 
+      clickCount: 0,
       parts: [
         { id: 'ar2p1', title: 'قراءة الرواية', adUrl: '', content: 'محتوى رواية أولاد حارتنا...' }
       ]
@@ -30,6 +33,7 @@ const initialBooks = {
       title: 'مئة عام من العزلة', 
       author: 'غابرييل غارسيا ماركيز', 
       coverColor: 'bg-purple-100', 
+      clickCount: 0,
       parts: [
         { id: 'en1p1', title: 'قراءة الرواية', adUrl: '', content: 'محتوى رواية مئة عام من العزلة...' }
       ]
@@ -41,6 +45,7 @@ const initialBooks = {
       title: 'مغامرات سندباد', 
       author: 'تراث', 
       coverColor: 'bg-green-100', 
+      clickCount: 0,
       parts: [
         { id: 'ch1p1', title: 'قراءة القصة', adUrl: '', content: 'محتوى قصة مغامرات سندباد...' }
       ] 
@@ -52,6 +57,7 @@ const initialBooks = {
       title: 'كبرياء وهوى', 
       author: 'جين أوستن', 
       coverColor: 'bg-pink-100', 
+      clickCount: 0,
       parts: [
         { id: 'ro1p1', title: 'قراءة الرواية', adUrl: '', content: 'محتوى رواية كبرياء وهوى...' }
       ]
@@ -63,6 +69,7 @@ const initialBooks = {
       title: 'جريمة في قطار الشرق', 
       author: 'أجاثا كريستي', 
       coverColor: 'bg-gray-200', 
+      clickCount: 0,
       parts: [
         { id: 'my1p1', title: 'قراءة الرواية', adUrl: '', content: 'محتوى رواية جريمة في قطار الشرق...' }
       ]
@@ -74,6 +81,7 @@ const initialBooks = {
       title: 'العادات السبع للناس الأكثر فعالية', 
       author: 'ستيفن كوفي', 
       coverColor: 'bg-sky-100', 
+      clickCount: 0,
       parts: [
         { id: 'dv1p1', title: 'قراءة الكتاب', adUrl: '', content: 'محتوى كتاب العادات السبع...' }
       ]
@@ -83,6 +91,7 @@ const initialBooks = {
 
 const DEFAULT_SETTINGS: AppSettings = {
   siteName: "مكتبة الحكايات",
+  siteLogoUrl: "",
   colors: {
     background: "bg-slate-900",
     text: "text-slate-200",
@@ -129,7 +138,27 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    try {
+      const storedSettings = localStorage.getItem('librarySettings');
+      if (storedSettings) {
+        // A simple migration to ensure clickCount exists
+        const parsed = JSON.parse(storedSettings);
+        parsed.categories.forEach((cat: any) => {
+          cat.books.forEach((book: any) => {
+            if (book.clickCount === undefined) {
+              book.clickCount = 0;
+            }
+          });
+        });
+        return parsed;
+      }
+      return DEFAULT_SETTINGS;
+    } catch (error) {
+      console.error("Failed to parse settings from localStorage", error);
+      return DEFAULT_SETTINGS;
+    }
+  });
 
   return (
     <SettingsContext.Provider value={{ settings, setSettings }}>

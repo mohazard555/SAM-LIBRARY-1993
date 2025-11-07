@@ -19,7 +19,11 @@ const Header: React.FC<HeaderProps> = ({ onSettingsClick, onAboutClick, onPromot
     <header className="py-4 px-6 md:px-10 shadow-lg bg-slate-800/50 backdrop-blur-sm sticky top-0 z-40">
       <div className="container mx-auto flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <Logo className={`w-10 h-10 ${settings.colors.primary}`} />
+          {settings.siteLogoUrl ? (
+            <img src={settings.siteLogoUrl} alt={`${settings.siteName} logo`} className="w-10 h-10 object-contain" />
+          ) : (
+            <Logo className={`w-10 h-10 ${settings.colors.primary}`} />
+          )}
           <h1 className={`text-xl md:text-2xl font-bold ${settings.colors.primary}`}>
             {settings.siteName}
           </h1>

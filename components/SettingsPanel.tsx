@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
-import type { AppSettings, Category } from '../types';
+import type { AppSettings, Book, Category, PromotionalAd } from '../types';
 import { TrashIcon } from './icons/TrashIcon';
 
 interface SettingsPanelProps {
@@ -19,389 +20,402 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [newCategoryTitle, setNewCategoryTitle] = useState('');
   const [newCategoryEmoji, setNewCategoryEmoji] = useState('');
 
-  const [selectedBookForAd, setSelectedBookForAd] = useState('');
-  
-  const [newPromoAd, setNewPromoAd] = useState({ title: '', description: '', imageUrl: '', linkUrl: '' });
+  const [selectedBookKey, setSelectedBookKey] = useState('');
+  const [bookEditForm, setBookEditForm] = useState<{title: string; author: string; coverColor: string} | null>(null);
 
+  const [newPromoAd, setNewPromoAd] = useState<Omit<PromotionalAd, 'id'>>({ title: '', description: '', imageUrl: '', linkUrl: '' });
+  const [newBook, setNewBook] = useState({
+    title: '',
+    author: '',
+    coverColor: 'bg-gray-100',
+    categoryId: '',
+    content: '',
+    partTitle: 'قراءة الرواية',
+  });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, section: keyof AppSettings, field: string) => {
-    const value = e.target.value;
-    setLocalSettings(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [field]: e.target.type === 'number' ? Number(value) : value
-      }
-    }));
-  };
-  
-  const handleAddCategory = () => {
-    if (!newCategoryTitle || !newCategoryEmoji) {
-      alert('يرجى إدخال عنوان وأيقونة للقسم الجديد.');
-      return;
+  useEffect(() => {
+    setCategoriesJson(JSON.stringify(localSettings.categories, null, 2));
+  }, [localSettings.categories]);
+
+  useEffect(() => {
+    if (selectedBookKey) {
+        const [catIndex, bookIndex] = selectedBookKey.split('-').map(Number);
+        const book = localSettings.categories[catIndex]?.books[bookIndex];
+        if (book) {
+            setBookEditForm({
+                title: book.title,
+                author: book.author,
+                coverColor: book.coverColor
+            });
+        }
+    } else {
+        setBookEditForm(null);
     }
-    const newCategory: Category = {
-      id: `c${Date.now()}`,
-      title: newCategoryTitle,
-      emoji: newCategoryEmoji,
-      books: [],
-    };
-    const updatedCategories = [...localSettings.categories, newCategory];
-    setLocalSettings(prev => ({ ...prev, categories: updatedCategories }));
-    setCategoriesJson(JSON.stringify(updatedCategories, null, 2));
-    setNewCategoryTitle('');
-    setNewCategoryEmoji('');
-  };
+  }, [selectedBookKey, localSettings.categories]);
 
-  const handlePartAdSettingChange = (partIndex: number, field: 'watchUrl' | 'adUrl' | 'adDuration', value: string) => {
-    if (!selectedBookForAd) return;
-    const [catIndex, bookIndex] = selectedBookForAd.split('-').map(Number);
 
-    setLocalSettings(prevSettings => {
-        const newCategories = prevSettings.categories.map((cat, cIdx) => {
-            if (cIdx !== catIndex) return cat;
-            return {
-                ...cat,
-                books: cat.books.map((book, bIdx) => {
-                    if (bIdx !== bookIndex) return book;
-                    return {
-                        ...book,
-                        parts: book.parts.map((part, pIdx) => {
-                            if (pIdx !== partIndex) return part;
-                            const finalValue = field === 'adDuration' ? (value === '' ? undefined : Number(value)) : value;
-                            return { ...part, [field]: finalValue };
-                        })
-                    };
-                })
-            };
-        });
-        setCategoriesJson(JSON.stringify(newCategories, null, 2));
-        return { ...prevSettings, categories: newCategories };
+  const handleSettingsChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, 
+    ...keys: string[]
+) => {
+    const { value } = e.target;
+    setLocalSettings(prev => {
+        const newState = JSON.parse(JSON.stringify(prev)); // Deep copy for nested objects
+        let currentLevel: any = newState;
+        
+        for (let i = 0; i < keys.length - 1; i++) {
+            currentLevel = currentLevel[keys[i]];
+        }
+        
+        currentLevel[keys[keys.length - 1]] = value;
+        return newState;
     });
 };
 
-  const handleNewPromoAdChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setNewPromoAd({ ...newPromoAd, [e.target.name]: e.target.value });
+  const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCategoriesJson(e.target.value);
+  };
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        if (file.size > 2 * 1024 * 1024) { // 2MB limit
+            alert("حجم الملف كبير جداً. يرجى اختيار صورة أصغر من 2 ميجابايت.");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            callback(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    }
   };
 
-  const handleAddPromoAd = () => {
-      if (!newPromoAd.title || !newPromoAd.imageUrl || !newPromoAd.linkUrl) {
-          alert('يرجى إدخال العنوان ورابط الصورة ورابط الانتقال للإعلان.');
+  const applyJsonToSettings = () => {
+    try {
+      const parsedCategories = JSON.parse(categoriesJson);
+      if (Array.isArray(parsedCategories)) {
+        setLocalSettings(prev => ({ ...prev, categories: parsedCategories }));
+        alert('تم تحديث الأقسام بنجاح!');
+      } else {
+        throw new Error("Invalid format: Must be an array of categories.");
+      }
+    } catch (error) {
+      alert('خطأ في تنسيق JSON. يرجى التحقق منه والمحاولة مرة أخرى.');
+      console.error("JSON parsing error:", error);
+    }
+  };
+  
+  const handleFindAndReplace = () => {
+      if (!findText) {
+          alert("يرجى إدخال النص المراد البحث عنه.");
           return;
       }
-      const adToAdd = { ...newPromoAd, id: `p${Date.now()}` };
-      setLocalSettings(prev => ({
-          ...prev,
-          promotionalAds: [...prev.promotionalAds, adToAdd]
-      }));
-      setNewPromoAd({ title: '', description: '', imageUrl: '', linkUrl: '' }); // Reset form
+      const updatedCategoriesJson = categoriesJson.replaceAll(findText, replaceText);
+      setCategoriesJson(updatedCategoriesJson);
+      alert(`تم استبدال "${findText}" بـ "${replaceText}" في جميع المحتويات.`);
   };
 
-  const handleDeletePromoAd = (id: string) => {
-      if (window.confirm('هل أنت متأكد من حذف هذا الإعلان؟')) {
-        setLocalSettings(prev => ({
-            ...prev,
-            promotionalAds: prev.promotionalAds.filter(ad => ad.id !== id)
-        }));
+  const handleAddCategory = () => {
+      if (!newCategoryTitle || !newCategoryEmoji) {
+          alert('يرجى إدخال عنوان ورمز تعبيري للقسم الجديد.');
+          return;
       }
+      const newCategory: Category = {
+          id: `c${Date.now()}`,
+          title: newCategoryTitle,
+          emoji: newCategoryEmoji,
+          books: []
+      };
+      const updatedCategories = [...localSettings.categories, newCategory];
+      setLocalSettings(prev => ({ ...prev, categories: updatedCategories }));
+      setNewCategoryTitle('');
+      setNewCategoryEmoji('');
   };
 
+  const handleDeleteCategory = (categoryId: string) => {
+    if(!categoryId) return;
+    if (window.confirm("هل أنت متأكد من رغبتك في حذف هذا القسم وجميع الكتب الموجودة فيه؟")) {
+        const updatedCategories = localSettings.categories.filter(cat => cat.id !== categoryId);
+        setLocalSettings(prev => ({ ...prev, categories: updatedCategories }));
+    }
+  };
 
   const handleSave = () => {
     try {
       const parsedCategories = JSON.parse(categoriesJson);
-      const newSettings = { ...localSettings, categories: parsedCategories };
-      setSettings(newSettings);
-      setLocalSettings(newSettings);
-      alert('تم حفظ الإعدادات بنجاح!');
-      onClose();
+      if (Array.isArray(parsedCategories)) {
+        const finalSettings = {...localSettings, categories: parsedCategories};
+        setSettings(finalSettings);
+        localStorage.setItem('librarySettings', JSON.stringify(finalSettings));
+        alert('تم حفظ الإعدادات بنجاح!');
+        onClose();
+      } else {
+         throw new Error("Invalid JSON format for categories.");
+      }
     } catch (error) {
-      alert('خطأ في تنسيق بيانات JSON. يرجى التحقق من صحة البيانات في قسم الأقسام.');
-      console.error("JSON parsing error:", error);
-    }
-  };
-
-  const handleExport = () => {
-    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(settings, null, 2))}`;
-    const link = document.createElement('a');
-    link.href = jsonString;
-    link.download = 'settings.json';
-    link.click();
-  };
-
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const text = e.target?.result;
-          if (typeof text === 'string') {
-            const importedSettings = JSON.parse(text);
-            setSettings(importedSettings);
-            setLocalSettings(importedSettings);
-            setCategoriesJson(JSON.stringify(importedSettings.categories, null, 2));
-            alert('تم استيراد الإعدادات بنجاح!');
-          }
-        } catch (error) {
-          alert('ملف JSON غير صالح أو تالف.');
-        }
-      };
-      reader.readAsText(file);
+       alert('خطأ في تنسيق JSON الخاص بالأقسام. يرجى التحقق منه والمحاولة مرة أخرى قبل الحفظ.');
     }
   };
   
-  const handleReplaceAll = () => {
-    if(!findText) {
-        alert("يرجى إدخال النص المراد البحث عنه.");
+  const handleReset = () => {
+    if (window.confirm('هل أنت متأكد من رغبتك في إعادة تعيين كافة الإعدادات إلى الوضع الافتراضي؟ سيتم فقدان جميع التغييرات.')) {
+        localStorage.removeItem('librarySettings');
+        window.location.reload();
+    }
+  };
+
+  const handleAddPromoAd = () => {
+      if (!newPromoAd.title || !newPromoAd.imageUrl || !newPromoAd.linkUrl) {
+          alert('يرجى ملء حقول العنوان والصورة والرابط المستهدف للإعلان.');
+          return;
+      }
+      const adToAdd: PromotionalAd = { ...newPromoAd, id: `p${Date.now()}` };
+      setLocalSettings(prev => ({
+          ...prev,
+          promotionalAds: [...prev.promotionalAds, adToAdd]
+      }));
+      setNewPromoAd({ title: '', description: '', imageUrl: '', linkUrl: '' });
+  };
+
+  const handleDeletePromoAd = (adId: string) => {
+      setLocalSettings(prev => ({
+          ...prev,
+          promotionalAds: prev.promotionalAds.filter(ad => ad.id !== adId)
+      }));
+  };
+
+  const handleBookEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (bookEditForm) {
+          setBookEditForm({
+              ...bookEditForm,
+              [e.target.name]: e.target.value
+          });
+      }
+  };
+
+  const handleUpdateBook = () => {
+      if (!selectedBookKey || !bookEditForm) return;
+      const [catIndex, bookIndex] = selectedBookKey.split('-').map(Number);
+      
+      setLocalSettings(prev => {
+        const updatedCategories = [...prev.categories];
+        const bookToUpdate = updatedCategories[catIndex].books[bookIndex];
+        
+        updatedCategories[catIndex].books[bookIndex] = {
+            ...bookToUpdate,
+            title: bookEditForm.title,
+            author: bookEditForm.author,
+            coverColor: bookEditForm.coverColor
+        };
+        return { ...prev, categories: updatedCategories };
+      });
+      alert('تم تحديث معلومات الحكاية بنجاح.');
+  };
+  
+  const handleDeleteBook = () => {
+      if (!selectedBookKey) return;
+      if (window.confirm('هل أنت متأكد من رغبتك في حذف هذه الحكاية؟')) {
+          const [catIndex, bookIndex] = selectedBookKey.split('-').map(Number);
+          setLocalSettings(prev => {
+              const updatedCategories = [...prev.categories];
+              updatedCategories[catIndex].books.splice(bookIndex, 1);
+              return { ...prev, categories: updatedCategories };
+          });
+          setSelectedBookKey('');
+      }
+  };
+
+  const handleNewBookChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setNewBook(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddBook = () => {
+    if (!newBook.title || !newBook.author || !newBook.categoryId || !newBook.content) {
+        alert('يرجى ملء جميع حقول الحكاية الجديدة.');
         return;
     }
-    const settingsString = JSON.stringify(localSettings);
-    const newSettingsString = settingsString.replace(new RegExp(findText.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), replaceText);
-    const newSettingsObject = JSON.parse(newSettingsString);
-    setLocalSettings(newSettingsObject);
-    setCategoriesJson(JSON.stringify(newSettingsObject.categories, null, 2));
-    alert(`تم استبدال "${findText}" بـ "${replaceText}" في جميع الإعدادات.`);
-  }
 
-  const handleGistSync = async (action: 'load' | 'save') => {
-    const { rawUrl, token } = localSettings.gistSync;
-    if(!rawUrl || (action === 'save' && !token)) {
-      alert("يرجى إدخال رابط Gist Raw URL و Token للمزامنة.");
-      return;
-    }
+    const newBookObject: Book = {
+        id: `b${Date.now()}`,
+        title: newBook.title,
+        author: newBook.author,
+        coverColor: newBook.coverColor,
+        clickCount: 0,
+        parts: [
+            {
+                id: `p${Date.now()}`,
+                title: newBook.partTitle || 'الجزء الأول',
+                adUrl: '',
+                content: newBook.content
+            }
+        ]
+    };
 
-    try {
-        const urlParts = rawUrl.match(/gist\.githubusercontent\.com\/[^/]+\/([^/]+)\/raw\/(?:[^/]+\/)?(.+)/);
-        if (!urlParts || urlParts.length < 3) throw new Error("رابط Gist Raw URL غير صالح.");
-        
-        const gistId = urlParts[1];
-        const filename = urlParts[2];
-        const apiUrl = `https://api.github.com/gists/${gistId}`;
+    setLocalSettings(prev => {
+        const updatedCategories = prev.categories.map(cat => {
+            if (cat.id === newBook.categoryId) {
+                return { ...cat, books: [...cat.books, newBookObject] };
+            }
+            return cat;
+        });
+        return { ...prev, categories: updatedCategories };
+    });
 
-        if (action === 'load') {
-            const response = await fetch(rawUrl);
-            if(!response.ok) throw new Error(`فشل تحميل البيانات: ${response.statusText}`);
-            const data = await response.json();
-            setSettings(data);
-            setLocalSettings(data);
-            setCategoriesJson(JSON.stringify(data.categories, null, 2));
-            alert("تم تحميل الإعدادات من Gist بنجاح.");
-        } else { // save
-            const contentToSave = JSON.stringify(localSettings, null, 2);
-            const response = await fetch(apiUrl, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                },
-                body: JSON.stringify({
-                    files: {
-                        [filename]: {
-                            content: contentToSave,
-                        },
-                    },
-                }),
-            });
-            if(!response.ok) throw new Error(`فشل حفظ البيانات: ${response.statusText}`);
-            alert("تم حفظ الإعدادات في Gist بنجاح.");
-        }
-    } catch(error) {
-        alert(`حدث خطأ أثناء المزامنة: ${error.message}`);
-        console.error("Gist Sync Error:", error);
-    }
+    alert(`تمت إضافة حكاية "${newBook.title}" بنجاح!`);
+    setNewBook({
+        title: '', author: '', coverColor: 'bg-gray-100', categoryId: '', content: '', partTitle: 'قراءة الرواية',
+    });
   };
 
-
-  const InputField: React.FC<{label: string; value: string | number; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; placeholder?:string, name?: string}> = ({label, value, onChange, type = 'text', placeholder, name}) => (
-    <div>
-        <label className="block mb-1 font-semibold text-slate-300">{label}</label>
-        <input name={name} type={type} value={value} onChange={onChange} placeholder={placeholder} className="w-full p-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"/>
-    </div>
-  )
-  
-  const TextAreaField: React.FC<{label: string; value: string; onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void; name?: string, placeholder?: string, rows?: number}> = ({label, value, onChange, name, placeholder, rows=3}) => (
-    <div>
-        <label className="block mb-1 font-semibold text-slate-300">{label}</label>
-        <textarea name={name} value={value} onChange={onChange} placeholder={placeholder} rows={rows} className="w-full p-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"></textarea>
-    </div>
-  )
-
-  const Section: React.FC<{title: string; children: React.ReactNode}> = ({title, children}) => (
-     <details className="p-6 bg-slate-800 rounded-lg border border-slate-700" open>
-        <summary className="text-xl font-bold text-sky-400 cursor-pointer">{title}</summary>
-        <div className="mt-4 border-t border-slate-700 pt-4">
-            {children}
-        </div>
-     </details>
-  )
-  
-  const selectedBookData = selectedBookForAd ? localSettings.categories[Number(selectedBookForAd.split('-')[0])].books[Number(selectedBookForAd.split('-')[1])] : null;
-
   return (
-    <div className="fixed inset-0 bg-slate-900 z-50 p-4 md:p-8 overflow-y-auto">
-      <div className="container mx-auto max-w-4xl text-slate-200">
-        <div className="flex justify-between items-center mb-6">
-            <h2 className="text-3xl font-bold text-amber-400">لوحة الإعدادات</h2>
-            <button onClick={onClose} className="text-3xl text-slate-400 hover:text-white">&times;</button>
-        </div>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4">
+      <div className="bg-slate-900 rounded-lg shadow-2xl w-full max-w-6xl h-[95vh] flex flex-col border border-slate-700">
+        <header className="p-4 flex justify-between items-center border-b border-slate-700 flex-shrink-0">
+          <h2 className="text-2xl font-bold text-amber-400">لوحة الإعدادات</h2>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </header>
         
-        <div className="space-y-6">
-            <Section title="الإعدادات العامة">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <InputField label="اسم الموقع" value={localSettings.siteName} onChange={(e) => setLocalSettings({...localSettings, siteName: e.target.value})} />
+        <main className="p-6 overflow-y-auto flex-grow text-slate-300">
+          <div className="space-y-8">
+            <div className="p-4 border border-slate-700 rounded-lg">
+              <h3 className="text-xl font-bold mb-4 text-sky-400">الإعدادات العامة</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col">
+                  <label htmlFor="siteName" className="mb-1 text-slate-400">اسم الموقع</label>
+                  <input type="text" id="siteName" value={localSettings.siteName} onChange={(e) => handleSettingsChange(e, 'siteName')} className="bg-slate-800 border border-slate-600 rounded-md p-2 focus:ring-sky-500 focus:border-sky-500" />
                 </div>
-            </Section>
-            
-            <Section title="إدارة البيانات">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <button onClick={handleExport} className="w-full p-3 bg-green-600 hover:bg-green-700 rounded-md font-bold transition-colors">تصدير الإعدادات (JSON)</button>
-                    <div>
-                        <label htmlFor="import-file" className="w-full text-center block p-3 bg-blue-600 hover:bg-blue-700 rounded-md font-bold transition-colors cursor-pointer">استيراد الإعدادات (JSON)</label>
-                        <input id="import-file" type="file" accept=".json" onChange={handleImport} className="hidden" />
+                <div className="flex flex-col gap-2">
+                    <label className="text-slate-400">شعار الموقع</label>
+                    <div className="flex items-center gap-4">
+                        {localSettings.siteLogoUrl && <img src={localSettings.siteLogoUrl} alt="logo preview" className="w-12 h-12 object-contain bg-slate-700 rounded-md p-1" />}
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, (base64) => setLocalSettings(prev => ({...prev, siteLogoUrl: base64})))} className="text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-700"/>
                     </div>
-                </div>
-            </Section>
-            
-            <Section title="المزامنة عبر الإنترنت (GitHub Gist)">
-                 <div className="space-y-4">
-                    <p className="text-sm text-slate-400">
-                      1. الصق Gist Raw URL ليكون مصدر بيانات الموقع.<br/>
-                      2. أنشئ Personal Access Token (Classic) من GitHub مع صلاحية `gist` فقط.<br/>
-                      3. الصق الـ Token في الحقل الثاني لتمكين الحفظ والمزامنة.
-                    </p>
-                    <InputField label="رابط Gist Raw للمزامنة" placeholder="https://gist.githubusercontent.com/..." value={localSettings.gistSync.rawUrl} onChange={(e) => handleInputChange(e, 'gistSync', 'rawUrl')} />
-                    <InputField label="GitHub Personal Access Token" type="password" placeholder="****************************************" value={localSettings.gistSync.token} onChange={(e) => handleInputChange(e, 'gistSync', 'token')} />
-                    <div className="flex gap-4">
-                        <button onClick={() => handleGistSync('load')} className="flex-1 p-3 bg-sky-600 hover:bg-sky-700 rounded-md font-bold transition-colors">تحميل من Gist</button>
-                        <button onClick={() => handleGistSync('save')} className="flex-1 p-3 bg-purple-600 hover:bg-purple-700 rounded-md font-bold transition-colors">حفظ إلى Gist</button>
-                    </div>
-                 </div>
-            </Section>
-
-            <Section title="استبدال قيم التطبيق">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <InputField label="بحث عن" value={findText} onChange={(e) => setFindText(e.target.value)} />
-                    <InputField label="استبدال بـ" value={replaceText} onChange={(e) => setReplaceText(e.target.value)} />
-                    <button onClick={handleReplaceAll} className="p-3 bg-red-600 hover:bg-red-700 rounded-md font-bold transition-colors">استبدال الكل</button>
-                </div>
-            </Section>
-
-            <Section title="إعدادات الإعلان الافتراضي">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <InputField label="رابط الإعلان (URL)" value={localSettings.ad.url} onChange={(e) => handleInputChange(e, 'ad', 'url')} />
-                    <InputField label="مدة المشاهدة (ثواني)" type="number" value={localSettings.ad.duration} onChange={(e) => handleInputChange(e, 'ad', 'duration')} />
-                </div>
-            </Section>
-
-            <Section title="إعدادات الإعلانات المخصصة للحكايات">
-                <div className="space-y-4">
-                    <div>
-                        <label htmlFor="book-select" className="block mb-1 font-semibold text-slate-300">اختر حكاية لتعديل إعداداتها</label>
-                        <select
-                            id="book-select"
-                            value={selectedBookForAd}
-                            onChange={(e) => setSelectedBookForAd(e.target.value)}
-                            className="w-full p-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
-                        >
-                            <option value="">-- اختر حكاية --</option>
-                            {localSettings.categories.map((cat, catIndex) => 
-                                cat.books.map((book, bookIndex) => (
-                                    <option key={book.id} value={`${catIndex}-${bookIndex}`}>
-                                        {cat.title} - {book.title}
-                                    </option>
-                                ))
-                            )}
-                        </select>
-                    </div>
-                    {selectedBookData && (
-                        <div className="space-y-4 border-t border-slate-700 pt-4">
-                            {selectedBookData.parts.map((part, partIndex) => (
-                                <div key={part.id} className="p-3 bg-slate-900/50 rounded-md border border-slate-700">
-                                    <h4 className="font-bold text-lg text-amber-400 mb-2">{part.title}</h4>
-                                    <div className="space-y-2">
-                                        <InputField name="watchUrl" label="رابط المشاهدة (يوتيوب)" placeholder="https://youtube.com/..." value={part.watchUrl || ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'watchUrl', e.target.value)} />
-                                        <InputField name="adUrl" label="رابط الإعلان النهائي" placeholder={settings.ad.url} value={part.adUrl || ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'adUrl', e.target.value)} />
-                                        <InputField name="adDuration" label="مدة الإعلان (ثواني)" type="number" placeholder={String(settings.ad.duration)} value={part.adDuration ?? ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'adDuration', e.target.value)} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </Section>
-            
-             <Section title="إضافة قسم جديد">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <InputField label="عنوان القسم" value={newCategoryTitle} onChange={(e) => setNewCategoryTitle(e.target.value)} />
-                    <InputField label="أيقونة (Emoji)" value={newCategoryEmoji} onChange={(e) => setNewCategoryEmoji(e.target.value)} />
-                    <button onClick={handleAddCategory} className="p-3 bg-green-600 hover:bg-green-700 rounded-md font-bold transition-colors">إضافة قسم</button>
-                </div>
-            </Section>
-            
-            <Section title="إدارة الإعلانات الترويجية">
-              <div className="space-y-6">
-                <div className="p-4 bg-slate-900/50 rounded-md border border-slate-700 space-y-3">
-                    <h4 className="text-lg font-semibold text-amber-400">إضافة إعلان جديد</h4>
-                    <p className="text-sm text-slate-400 -mt-2">بالنسبة للصور، يرجى رفعها على موقع استضافة صور (مثل imgbb.com) ولصق الرابط المباشر هنا.</p>
-                    <InputField name="title" label="العنوان" value={newPromoAd.title} onChange={handleNewPromoAdChange} />
-                    <TextAreaField name="description" label="الوصف" value={newPromoAd.description} onChange={handleNewPromoAdChange} />
-                    <InputField name="imageUrl" label="رابط الصورة" placeholder="https://example.com/image.png" value={newPromoAd.imageUrl} onChange={handleNewPromoAdChange} />
-                    <InputField name="linkUrl" label="رابط الانتقال" placeholder="https://example.com/product" value={newPromoAd.linkUrl} onChange={handleNewPromoAdChange} />
-                    <button onClick={handleAddPromoAd} className="w-full p-3 bg-sky-600 hover:bg-sky-700 rounded-md font-bold transition-colors">إضافة إعلان</button>
-                </div>
-                
-                <div className="space-y-3">
-                    <h4 className="text-lg font-semibold text-amber-400">الإعلانات الحالية</h4>
-                    {localSettings.promotionalAds.length === 0 ? (
-                        <p className="text-slate-400 bg-slate-900/50 p-4 rounded-md text-center">لا توجد إعلانات ترويجية حالياً.</p>
-                    ) : (
-                        localSettings.promotionalAds.map(ad => (
-                            <div key={ad.id} className="p-3 bg-slate-900/50 rounded-md border border-slate-700 flex items-start gap-4">
-                                <img src={ad.imageUrl} alt={ad.title} className="w-24 h-16 object-cover rounded-md flex-shrink-0 border border-slate-600" />
-                                <div className="flex-grow">
-                                    <h5 className="font-bold text-slate-200">{ad.title}</h5>
-                                    <p className="text-sm text-slate-400 mb-1">{ad.description}</p>
-                                    <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 hover:underline break-all">{ad.linkUrl}</a>
-                                </div>
-                                <button onClick={() => handleDeletePromoAd(ad.id)} className="p-2 bg-red-600/50 hover:bg-red-600 text-white rounded-full transition-colors flex-shrink-0" aria-label="حذف الإعلان">
-                                    <TrashIcon className="w-5 h-5" />
-                                </button>
-                            </div>
-                        ))
-                    )}
+                    <input type="text" placeholder="أو الصق رابط شعار هنا" value={localSettings.siteLogoUrl.startsWith('data:image') ? '' : localSettings.siteLogoUrl} onChange={(e) => handleSettingsChange(e, 'siteLogoUrl')} className="bg-slate-800 border border-slate-600 rounded-md p-2 focus:ring-sky-500 focus:border-sky-500 text-sm" />
                 </div>
               </div>
-            </Section>
+            </div>
 
-            <Section title="معلومات المطور">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <InputField label="اسم المطور" value={localSettings.developer.name} onChange={(e) => handleInputChange(e, 'developer', 'name')} />
-                    <InputField label="البريد الإلكتروني" value={localSettings.developer.email} onChange={(e) => handleInputChange(e, 'developer', 'email')} />
-                    <InputField label="نص حقوق النشر" value={localSettings.developer.copyright} onChange={(e) => handleInputChange(e, 'developer', 'copyright')} />
+            <div className="p-4 border border-slate-700 rounded-lg">
+                <h3 className="text-xl font-bold mb-4 text-sky-400">إدارة الحكايات وإعلاناتها</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {/* Add new book column */}
+                    <div className="p-3 bg-slate-800/50 border border-slate-700 rounded-md space-y-3">
+                        <h4 className="text-lg font-semibold text-amber-400">إضافة حكاية جديدة</h4>
+                        <input type="text" name="title" value={newBook.title} onChange={handleNewBookChange} placeholder="عنوان الحكاية" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                        <input type="text" name="author" value={newBook.author} onChange={handleNewBookChange} placeholder="المؤلف" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                        <input type="text" name="coverColor" value={newBook.coverColor} onChange={handleNewBookChange} placeholder="لون الخلفية" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                        <select name="categoryId" value={newBook.categoryId} onChange={handleNewBookChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2">
+                            <option value="">-- اختر القسم --</option>
+                            {localSettings.categories.map(cat => <option key={cat.id} value={cat.id}>{cat.title}</option>)}
+                        </select>
+                        <input type="text" name="partTitle" value={newBook.partTitle} onChange={handleNewBookChange} placeholder="عنوان الجزء الأول" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                        <textarea name="content" value={newBook.content} onChange={handleNewBookChange} placeholder="محتوى الحكاية" className="w-full h-24 bg-slate-700 border border-slate-600 rounded-md p-2"></textarea>
+                        <button onClick={handleAddBook} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors">إضافة الحكاية</button>
+                    </div>
+                    {/* Edit/Delete book column */}
+                    <div>
+                        <h4 className="text-lg font-semibold mb-2 text-amber-400">تعديل أو حذف حكاية</h4>
+                        <div className="flex flex-col gap-4">
+                            <div>
+                                <label htmlFor="book-select" className="block mb-1 text-slate-400">اختر الحكاية:</label>
+                                <select id="book-select" value={selectedBookKey} onChange={e => setSelectedBookKey(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-md p-2">
+                                    <option value="">-- اختر حكاية للتعديل --</option>
+                                    {localSettings.categories.map((cat, catIndex) => (
+                                        <optgroup label={cat.title} key={cat.id}>
+                                            {cat.books.map((book, bookIndex) => (
+                                                <option key={book.id} value={`${catIndex}-${bookIndex}`}>{book.title}</option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
+                                </select>
+                            </div>
+                            {bookEditForm && (
+                                <div className="p-3 bg-slate-800/50 border border-slate-600 rounded-md space-y-3">
+                                    <input type="text" name="title" value={bookEditForm.title} onChange={handleBookEditChange} placeholder="عنوان الحكاية" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                                    <input type="text" name="author" value={bookEditForm.author} onChange={handleBookEditChange} placeholder="المؤلف" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                                    <input type="text" name="coverColor" value={bookEditForm.coverColor} onChange={handleBookEditChange} placeholder="لون الخلفية (e.g., bg-teal-100)" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                                    <div className="flex gap-2">
+                                        <button onClick={handleUpdateBook} className="flex-grow bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded transition-colors">تحديث</button>
+                                        <button onClick={handleDeleteBook} className="bg-red-600 hover:bg-red-700 text-white font-bold p-2 rounded transition-colors"><TrashIcon className="w-5 h-5"/></button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    {/* Promo Ads Column */}
+                    <div>
+                        <h4 className="text-lg font-semibold mb-2 text-amber-400">إدارة الإعلانات الترويجية</h4>
+                        <div className="p-3 bg-slate-800/50 border border-slate-600 rounded-md space-y-3 mb-4">
+                            <input type="text" value={newPromoAd.title} onChange={e => setNewPromoAd({...newPromoAd, title: e.target.value})} placeholder="العنوان" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2" />
+                            <input type="text" value={newPromoAd.description} onChange={e => setNewPromoAd({...newPromoAd, description: e.target.value})} placeholder="الوصف" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2" />
+                            <div className="flex items-center gap-2">
+                                {newPromoAd.imageUrl && <img src={newPromoAd.imageUrl} alt="preview" className="w-10 h-10 object-cover rounded-sm"/>}
+                                <label className="w-full text-center bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded transition-colors cursor-pointer">
+                                  <span>اختيار صورة</span>
+                                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, (base64) => setNewPromoAd(prev => ({...prev, imageUrl: base64})))} className="hidden" />
+                                </label>
+                            </div>
+                            <input type="text" value={newPromoAd.linkUrl} onChange={e => setNewPromoAd({...newPromoAd, linkUrl: e.target.value})} placeholder="رابط الانتقال (URL)" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2" />
+                            <button onClick={handleAddPromoAd} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors">إضافة إعلان</button>
+                        </div>
+                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                          {localSettings.promotionalAds.map(ad => (
+                            <div key={ad.id} className="flex items-center justify-between bg-slate-700 p-2 rounded-md">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                    <img src={ad.imageUrl} alt={ad.title} className="w-10 h-10 object-cover rounded-sm flex-shrink-0" />
+                                    <p className="truncate text-sm">{ad.title}</p>
+                                </div>
+                                <button onClick={() => handleDeletePromoAd(ad.id)} className="p-1 text-red-400 hover:text-red-300"><TrashIcon className="w-5 h-5"/></button>
+                            </div>
+                          ))}
+                        </div>
+                    </div>
                 </div>
-            </Section>
-            
-            <Section title="صفحة 'حول الموقع'">
-                 <InputField label="عنوان الصفحة" value={localSettings.about.title} onChange={(e) => setLocalSettings({...localSettings, about: {...localSettings.about, title: e.target.value}})} />
-                 <div className="mt-4">
-                    <label className="block mb-1 font-semibold text-slate-300">محتوى الصفحة</label>
-                    <textarea value={localSettings.about.content} onChange={(e) => setLocalSettings({...localSettings, about: {...localSettings.about, content: e.target.value}})} rows={5} className="w-full p-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"></textarea>
-                 </div>
-            </Section>
-            
-            <Section title="الأقسام والكتب (JSON)">
-                <p className="text-sm text-slate-400 mb-4">
-                   يمكنك تعديل الأقسام والكتب. كل كتاب يحتوي على مصفوفة 'parts'. كل جزء له 'id', 'title', 'adUrl', و 'content'.
-                </p>
-                <textarea dir="ltr" className="w-full h-96 p-3 bg-slate-900 border border-slate-600 rounded-md text-green-300 font-mono focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none" value={categoriesJson} onChange={(e) => setCategoriesJson(e.target.value)} />
-            </Section>
-        </div>
+            </div>
 
-        <div className="mt-8 flex justify-end gap-4">
-             <button onClick={handleSave} className="px-8 py-3 bg-sky-600 hover:bg-sky-700 rounded-md font-bold transition-colors">حفظ التغييرات</button>
-             <button onClick={onClose} className="px-8 py-3 bg-slate-600 hover:bg-slate-700 rounded-md font-bold transition-colors">إلغاء</button>
-        </div>
+            <div className="p-4 border border-slate-700 rounded-lg">
+              <h3 className="text-xl font-bold mb-4 text-sky-400">محرر المحتوى المتقدم (JSON)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block mb-1 text-slate-400">إضافة قسم جديد</label>
+                  <div className="flex gap-2">
+                      <input type="text" value={newCategoryTitle} onChange={e => setNewCategoryTitle(e.target.value)} placeholder="عنوان القسم" className="flex-grow bg-slate-800 border border-slate-600 rounded-md p-2"/>
+                      <input type="text" value={newCategoryEmoji} onChange={e => setNewCategoryEmoji(e.target.value)} placeholder="Emoji" className="w-20 bg-slate-800 border border-slate-600 rounded-md p-2"/>
+                      <button onClick={handleAddCategory} className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded transition-colors">إضافة</button>
+                  </div>
+                </div>
+                <div>
+                   <label className="block mb-1 text-slate-400">حذف قسم</label>
+                   <select defaultValue="" onChange={e => handleDeleteCategory(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-md p-2">
+                     <option value="">-- اختر قسماً للحذف --</option>
+                     {localSettings.categories.map(cat => <option key={cat.id} value={cat.id}>{cat.title}</option>)}
+                   </select>
+                </div>
+              </div>
+              <div className="flex gap-2 mb-4">
+                <input type="text" value={findText} onChange={e => setFindText(e.target.value)} placeholder="بحث عن..." className="flex-grow bg-slate-800 border border-slate-600 rounded-md p-2"/>
+                <input type="text" value={replaceText} onChange={e => setReplaceText(e.target.value)} placeholder="استبدال بـ..." className="flex-grow bg-slate-800 border border-slate-600 rounded-md p-2"/>
+                <button onClick={handleFindAndReplace} className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded transition-colors">استبدال الكل</button>
+              </div>
+              <textarea value={categoriesJson} onChange={handleJsonChange} className="w-full h-64 bg-slate-950 border border-slate-600 rounded-md p-2 font-mono text-sm" spellCheck="false"></textarea>
+              <button onClick={applyJsonToSettings} className="mt-2 bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded transition-colors">تطبيق تغييرات JSON على الإعدادات</button>
+            </div>
+          </div>
+        </main>
+        
+        <footer className="p-4 flex justify-between items-center border-t border-slate-700 flex-shrink-0">
+          <button onClick={handleReset} className="bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors">إعادة تعيين الكل</button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded transition-colors">إلغاء</button>
+            <button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors">حفظ الإعدادات</button>
+          </div>
+        </footer>
       </div>
     </div>
   );

@@ -8,11 +8,12 @@ export interface ContentPart {
 }
 
 export interface Book {
-  id: string;
+  id:string;
   title: string;
   author: string;
   coverColor: string;
   parts: ContentPart[];
+  clickCount?: number;
 }
 
 export interface Category {
@@ -48,6 +49,7 @@ export interface GistSyncSettings {
 
 export interface AppSettings {
   siteName: string;
+  siteLogoUrl: string;
   colors: {
     background: string;
     text: string;
