@@ -8,6 +8,26 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
+const colorOptions = [
+    { name: 'رمادي فاتح', value: 'bg-slate-100' },
+    { name: 'أحمر فاتح', value: 'bg-red-100' },
+    { name: 'برتقالي فاتح', value: 'bg-orange-100' },
+    { name: 'كهرماني فاتح', value: 'bg-amber-100' },
+    { name: 'أصفر فاتح', value: 'bg-yellow-100' },
+    { name: 'ليموني فاتح', value: 'bg-lime-100' },
+    { name: 'أخضر فاتح', value: 'bg-green-100' },
+    { name: 'زمردي فاتح', value: 'bg-emerald-100' },
+    { name: 'تركواز فاتح', value: 'bg-teal-100' },
+    { name: 'سماوي فاتح', value: 'bg-sky-100' },
+    { name: 'أزرق فاتح', value: 'bg-blue-100' },
+    { name: 'نيلي فاتح', value: 'bg-indigo-100' },
+    { name: 'بنفسجي فاتح', value: 'bg-violet-100' },
+    { name: 'أرجواني فاتح', value: 'bg-purple-100' },
+    { name: 'فوشي فاتح', value: 'bg-fuchsia-100' },
+    { name: 'وردي فاتح', value: 'bg-pink-100' },
+    { name: 'وردي داكن فاتح', value: 'bg-rose-100' },
+];
+
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const { settings, setSettings } = useSettings();
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
@@ -27,7 +47,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [newBook, setNewBook] = useState({
     title: '',
     author: '',
-    coverColor: 'bg-gray-100',
+    coverColor: 'bg-slate-100',
     categoryId: '',
     content: '',
     partTitle: 'قراءة الرواية',
@@ -185,7 +205,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
       }));
   };
 
-  const handleBookEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBookEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       if (bookEditForm) {
           setBookEditForm({
               ...bookEditForm,
@@ -265,7 +285,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
     alert(`تمت إضافة حكاية "${newBook.title}" بنجاح!`);
     setNewBook({
-        title: '', author: '', coverColor: 'bg-gray-100', categoryId: '', content: '', partTitle: 'قراءة الرواية',
+        title: '', author: '', coverColor: 'bg-slate-100', categoryId: '', content: '', partTitle: 'قراءة الرواية',
     });
   };
 
@@ -309,7 +329,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                         <h4 className="text-lg font-semibold text-amber-400">إضافة حكاية جديدة</h4>
                         <input type="text" name="title" value={newBook.title} onChange={handleNewBookChange} placeholder="عنوان الحكاية" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
                         <input type="text" name="author" value={newBook.author} onChange={handleNewBookChange} placeholder="المؤلف" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
-                        <input type="text" name="coverColor" value={newBook.coverColor} onChange={handleNewBookChange} placeholder="لون الخلفية" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                        <select name="coverColor" value={newBook.coverColor} onChange={handleNewBookChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2">
+                           {colorOptions.map(color => (
+                                <option key={color.value} value={color.value}>{color.name}</option>
+                           ))}
+                        </select>
                         <select name="categoryId" value={newBook.categoryId} onChange={handleNewBookChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2">
                             <option value="">-- اختر القسم --</option>
                             {localSettings.categories.map(cat => <option key={cat.id} value={cat.id}>{cat.title}</option>)}
@@ -339,7 +363,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                                 <div className="p-3 bg-slate-800/50 border border-slate-600 rounded-md space-y-3">
                                     <input type="text" name="title" value={bookEditForm.title} onChange={handleBookEditChange} placeholder="عنوان الحكاية" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
                                     <input type="text" name="author" value={bookEditForm.author} onChange={handleBookEditChange} placeholder="المؤلف" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
-                                    <input type="text" name="coverColor" value={bookEditForm.coverColor} onChange={handleBookEditChange} placeholder="لون الخلفية (e.g., bg-teal-100)" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                                    <select name="coverColor" value={bookEditForm.coverColor} onChange={handleBookEditChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2">
+                                        {colorOptions.map(color => (
+                                            <option key={color.value} value={color.value}>{color.name}</option>
+                                        ))}
+                                    </select>
                                     <div className="flex gap-2">
                                         <button onClick={handleUpdateBook} className="flex-grow bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded transition-colors">تحديث</button>
                                         <button onClick={handleDeleteBook} className="bg-red-600 hover:bg-red-700 text-white font-bold p-2 rounded transition-colors"><TrashIcon className="w-5 h-5"/></button>
