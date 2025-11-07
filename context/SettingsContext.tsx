@@ -9,7 +9,7 @@ const initialBooks = {
       author: 'رضوى عاشور', 
       coverColor: 'bg-teal-100', 
       parts: [
-        { id: 'ar1p1', title: 'الجزء الأول: غرناطة', adUrl: 'https://example.com/ad-granada', content: 'محتوى الجزء الأول من رواية ثلاثية غرناطة...' },
+        { id: 'ar1p1', title: 'الجزء الأول: غرناطة', watchUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', adUrl: 'https://example.com/ad-granada', content: 'محتوى الجزء الأول من رواية ثلاثية غرناطة...' },
         { id: 'ar1p2', title: 'الجزء الثاني: مريمة', adUrl: 'https://example.com/ad-mariam', content: 'محتوى الجزء الثاني...' },
         { id: 'ar1p3', title: 'الجزء الثالث: الرحيل', adUrl: 'https://example.com/ad-departure', content: 'محتوى الجزء الثالث...' },
       ] 
@@ -92,7 +92,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   ad: {
     url: "https://google.com",
-    duration: 25,
+    duration: 20,
   },
   developer: {
     name: "مطور عربي",

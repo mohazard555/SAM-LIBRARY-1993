@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
-import type { AppSettings } from '../types';
+import type { AppSettings, Category } from '../types';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -16,6 +16,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
 
+  const [newCategoryTitle, setNewCategoryTitle] = useState('');
+  const [newCategoryEmoji, setNewCategoryEmoji] = useState('');
+
+  const [selectedBookForAd, setSelectedBookForAd] = useState('');
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, section: keyof AppSettings, field: string) => {
     const value = e.target.value;
@@ -27,6 +32,52 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
       }
     }));
   };
+  
+  const handleAddCategory = () => {
+    if (!newCategoryTitle || !newCategoryEmoji) {
+      alert('يرجى إدخال عنوان وأيقونة للقسم الجديد.');
+      return;
+    }
+    const newCategory: Category = {
+      id: `c${Date.now()}`,
+      title: newCategoryTitle,
+      emoji: newCategoryEmoji,
+      books: [],
+    };
+    const updatedCategories = [...localSettings.categories, newCategory];
+    setLocalSettings(prev => ({ ...prev, categories: updatedCategories }));
+    setCategoriesJson(JSON.stringify(updatedCategories, null, 2));
+    setNewCategoryTitle('');
+    setNewCategoryEmoji('');
+  };
+
+  const handlePartAdSettingChange = (partIndex: number, field: 'watchUrl' | 'adUrl' | 'adDuration', value: string) => {
+    if (!selectedBookForAd) return;
+    const [catIndex, bookIndex] = selectedBookForAd.split('-').map(Number);
+
+    setLocalSettings(prevSettings => {
+        const newCategories = prevSettings.categories.map((cat, cIdx) => {
+            if (cIdx !== catIndex) return cat;
+            return {
+                ...cat,
+                books: cat.books.map((book, bIdx) => {
+                    if (bIdx !== bookIndex) return book;
+                    return {
+                        ...book,
+                        parts: book.parts.map((part, pIdx) => {
+                            if (pIdx !== partIndex) return part;
+                            const finalValue = field === 'adDuration' ? (value === '' ? undefined : Number(value)) : value;
+                            return { ...part, [field]: finalValue };
+                        })
+                    };
+                })
+            };
+        });
+        setCategoriesJson(JSON.stringify(newCategories, null, 2));
+        return { ...prevSettings, categories: newCategories };
+    });
+};
+
 
   const handleSave = () => {
     try {
@@ -153,6 +204,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
         </div>
      </details>
   )
+  
+  const selectedBookData = selectedBookForAd ? localSettings.categories[Number(selectedBookForAd.split('-')[0])].books[Number(selectedBookForAd.split('-')[1])] : null;
 
   return (
     <div className="fixed inset-0 bg-slate-900 z-50 p-4 md:p-8 overflow-y-auto">
@@ -209,7 +262,52 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                     <InputField label="مدة المشاهدة (ثواني)" type="number" value={localSettings.ad.duration} onChange={(e) => handleInputChange(e, 'ad', 'duration')} />
                 </div>
             </Section>
+
+            <Section title="إعدادات الإعلانات المخصصة للحكايات">
+                <div className="space-y-4">
+                    <div>
+                        <label htmlFor="book-select" className="block mb-1 font-semibold text-slate-300">اختر حكاية لتعديل إعداداتها</label>
+                        <select
+                            id="book-select"
+                            value={selectedBookForAd}
+                            onChange={(e) => setSelectedBookForAd(e.target.value)}
+                            className="w-full p-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+                        >
+                            <option value="">-- اختر حكاية --</option>
+                            {localSettings.categories.map((cat, catIndex) => 
+                                cat.books.map((book, bookIndex) => (
+                                    <option key={book.id} value={`${catIndex}-${bookIndex}`}>
+                                        {cat.title} - {book.title}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+                    {selectedBookData && (
+                        <div className="space-y-4 border-t border-slate-700 pt-4">
+                            {selectedBookData.parts.map((part, partIndex) => (
+                                <div key={part.id} className="p-3 bg-slate-900/50 rounded-md border border-slate-700">
+                                    <h4 className="font-bold text-lg text-amber-400 mb-2">{part.title}</h4>
+                                    <div className="space-y-2">
+                                        <InputField label="رابط المشاهدة (يوتيوب)" placeholder="https://youtube.com/..." value={part.watchUrl || ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'watchUrl', e.target.value)} />
+                                        <InputField label="رابط الإعلان النهائي" placeholder={settings.ad.url} value={part.adUrl || ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'adUrl', e.target.value)} />
+                                        <InputField label="مدة الإعلان (ثواني)" type="number" placeholder={String(settings.ad.duration)} value={part.adDuration ?? ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'adDuration', e.target.value)} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </Section>
             
+             <Section title="إضافة قسم جديد">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <InputField label="عنوان القسم" value={newCategoryTitle} onChange={(e) => setNewCategoryTitle(e.target.value)} />
+                    <InputField label="أيقونة (Emoji)" value={newCategoryEmoji} onChange={(e) => setNewCategoryEmoji(e.target.value)} />
+                    <button onClick={handleAddCategory} className="p-3 bg-green-600 hover:bg-green-700 rounded-md font-bold transition-colors">إضافة قسم</button>
+                </div>
+            </Section>
+
             <Section title="معلومات المطور">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <InputField label="اسم المطور" value={localSettings.developer.name} onChange={(e) => handleInputChange(e, 'developer', 'name')} />

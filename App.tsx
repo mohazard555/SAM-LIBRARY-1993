@@ -51,19 +51,22 @@ const AppContent: React.FC = () => {
     setPartToRead(null);
   };
   
-  const filteredCategories = useMemo(() => {
+  const { filteredCategories, totalBooks } = useMemo(() => {
+    const total = settings.categories.reduce((acc, category) => acc + category.books.length, 0);
     if (!searchQuery) {
-        return settings.categories;
+        return { filteredCategories: settings.categories, totalBooks: total };
     }
     const lowercasedQuery = searchQuery.toLowerCase();
     
-    return settings.categories.map(category => {
+    const filtered = settings.categories.map(category => {
         const filteredBooks = category.books.filter(book => 
             book.title.toLowerCase().includes(lowercasedQuery) ||
             book.author.toLowerCase().includes(lowercasedQuery)
         );
         return { ...category, books: filteredBooks };
     }).filter(category => category.books.length > 0);
+
+    return { filteredCategories: filtered, totalBooks: total };
   }, [searchQuery, settings.categories]);
 
   return (
@@ -72,6 +75,7 @@ const AppContent: React.FC = () => {
         onSettingsClick={() => setIsSettingsOpen(true)} 
         onAboutClick={() => setIsAboutOpen(true)}
         onPromotionsClick={() => setIsPromotionsOpen(true)}
+        totalBooks={totalBooks}
       />
       
       <main className="container mx-auto px-6 md:px-10 py-8">
@@ -85,13 +89,15 @@ const AppContent: React.FC = () => {
             />
         </div>
 
-        {filteredCategories.length > 0 ? filteredCategories.map(category => (
-          <CategorySection key={category.id} category={category} onBookSelect={handleBookSelect} />
-        )) : (
-            <div className="text-center py-16">
-                <p className="text-2xl text-slate-400">لم يتم العثور على نتائج بحث.</p>
-            </div>
-        )}
+        <div className="space-y-6">
+            {filteredCategories.length > 0 ? filteredCategories.map(category => (
+            <CategorySection key={category.id} category={category} onBookSelect={handleBookSelect} />
+            )) : (
+                <div className="text-center py-16">
+                    <p className="text-2xl text-slate-400">لم يتم العثور على نتائج بحث.</p>
+                </div>
+            )}
+        </div>
       </main>
       
       <Footer />

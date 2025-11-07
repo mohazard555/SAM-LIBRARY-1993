@@ -9,9 +9,10 @@ interface HeaderProps {
   onSettingsClick: () => void;
   onAboutClick: () => void;
   onPromotionsClick: () => void;
+  totalBooks: number;
 }
 
-const Header: React.FC<HeaderProps> = ({ onSettingsClick, onAboutClick, onPromotionsClick }) => {
+const Header: React.FC<HeaderProps> = ({ onSettingsClick, onAboutClick, onPromotionsClick, totalBooks }) => {
   const { settings } = useSettings();
 
   return (
@@ -22,6 +23,9 @@ const Header: React.FC<HeaderProps> = ({ onSettingsClick, onAboutClick, onPromot
           <h1 className={`text-xl md:text-2xl font-bold ${settings.colors.primary}`}>
             {settings.siteName}
           </h1>
+          {totalBooks > 0 && (
+            <span className="text-xs sm:text-sm bg-slate-700 text-sky-300 px-2 py-1 rounded-full">{totalBooks} رواية</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
            <button

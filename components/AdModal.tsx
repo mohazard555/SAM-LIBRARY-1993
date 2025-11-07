@@ -11,15 +11,29 @@ interface AdModalProps {
 
 const AdModal: React.FC<AdModalProps> = ({ part, bookTitle, onClose, onAdFinished }) => {
   const { settings } = useSettings();
-  const [countdown, setCountdown] = useState(settings.ad.duration);
-  const adUrl = part.adUrl || settings.ad.url;
+
+  const adConfig = {
+    duration: part.adDuration ?? settings.ad.duration,
+    watchUrl: part.watchUrl,
+    adUrl: part.adUrl || settings.ad.url,
+  };
+
+  const [countdown, setCountdown] = useState(adConfig.duration);
+  const [countdownStarted, setCountdownStarted] = useState(!adConfig.watchUrl);
 
   useEffect(() => {
-    if (countdown > 0) {
+    if (countdown > 0 && countdownStarted) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
     }
-  }, [countdown]);
+  }, [countdown, countdownStarted]);
+
+  const handleWatchClick = () => {
+    if (adConfig.watchUrl) {
+      window.open(adConfig.watchUrl, '_blank', 'noopener,noreferrer');
+    }
+    setCountdownStarted(true);
+  };
 
   const isAdWatched = countdown <= 0;
 
@@ -28,23 +42,37 @@ const AdModal: React.FC<AdModalProps> = ({ part, bookTitle, onClose, onAdFinishe
       <div className="bg-slate-800 rounded-lg shadow-2xl p-6 w-full max-w-md text-center text-slate-200 border border-slate-700">
         <h2 className={`text-2xl font-bold mb-1 ${settings.colors.primary}`}>{bookTitle}</h2>
         <p className="mb-4 text-slate-400">{part.title}</p>
-        <p className="mb-4">لدعم المكتبة، يرجى مشاهدة الإعلان لفتح المحتوى.</p>
         
-        <div className="my-6">
-          {countdown > 0 ? (
-            <div>
-              <p className="text-lg">سيتم تفعيل الرابط خلال:</p>
-              <p className="text-5xl font-bold my-2 text-sky-400">{countdown}</p>
-              <p>ثوانٍ</p>
+        {!countdownStarted && adConfig.watchUrl ? (
+          <>
+            <p className="my-6">لدعم المكتبة، يرجى مشاهدة الفيديو أولاً لفتح المحتوى.</p>
+            <button
+              onClick={handleWatchClick}
+              className="w-full px-6 py-3 rounded-md font-semibold transition-all duration-300 bg-red-600 hover:bg-red-700 text-white"
+            >
+              مشاهدة الفيديو المطلوب
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mb-4">لدعم المكتبة، يرجى الانتظار ثم الانتقال للإعلان لفتح المحتوى.</p>
+            <div className="my-6">
+              {countdown > 0 ? (
+                <div>
+                  <p className="text-lg">سيتم تفعيل الرابط خلال:</p>
+                  <p className="text-5xl font-bold my-2 text-sky-400">{countdown}</p>
+                  <p>ثوانٍ</p>
+                </div>
+              ) : (
+                <p className="text-lg text-green-400">شكرًا لدعمك! يمكنك الآن المتابعة.</p>
+              )}
             </div>
-          ) : (
-            <p className="text-lg text-green-400">شكرًا لدعمك! يمكنك الآن المتابعة.</p>
-          )}
-        </div>
+          </>
+        )}
         
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
           <a
-            href={adUrl}
+            href={adConfig.adUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={onAdFinished}
@@ -54,13 +82,13 @@ const AdModal: React.FC<AdModalProps> = ({ part, bookTitle, onClose, onAdFinishe
                 : 'bg-sky-500 hover:bg-sky-600 text-white animate-pulse'
             }`}
             aria-disabled={!isAdWatched}
+            style={{ pointerEvents: isAdWatched ? 'auto' : 'none' }}
           >
             الانتقال إلى الإعلان
           </a>
           <button
             onClick={onClose}
-            disabled={!isAdWatched}
-            className="w-full px-6 py-3 rounded-md font-semibold bg-slate-700 hover:bg-slate-600 transition-colors duration-300 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed"
+            className="w-full px-6 py-3 rounded-md font-semibold bg-slate-700 hover:bg-slate-600 transition-colors duration-300"
           >
             إغلاق
           </button>

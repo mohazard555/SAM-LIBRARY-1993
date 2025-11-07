@@ -1,7 +1,9 @@
 export interface ContentPart {
   id: string;
   title: string;
+  watchUrl?: string;
   adUrl: string;
+  adDuration?: number;
   content: string;
 }
 
