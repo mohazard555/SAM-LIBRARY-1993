@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import type { AppSettings, Category } from '../types';
+import { TrashIcon } from './icons/TrashIcon';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -11,7 +12,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   
   const [categoriesJson, setCategoriesJson] = useState(JSON.stringify(settings.categories, null, 2));
-  const [promotionsJson, setPromotionsJson] = useState(JSON.stringify(settings.promotionalAds, null, 2));
 
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
@@ -20,6 +20,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [newCategoryEmoji, setNewCategoryEmoji] = useState('');
 
   const [selectedBookForAd, setSelectedBookForAd] = useState('');
+  
+  const [newPromoAd, setNewPromoAd] = useState({ title: '', description: '', imageUrl: '', linkUrl: '' });
 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, section: keyof AppSettings, field: string) => {
@@ -78,18 +80,43 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     });
 };
 
+  const handleNewPromoAdChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setNewPromoAd({ ...newPromoAd, [e.target.name]: e.target.value });
+  };
+
+  const handleAddPromoAd = () => {
+      if (!newPromoAd.title || !newPromoAd.imageUrl || !newPromoAd.linkUrl) {
+          alert('يرجى إدخال العنوان ورابط الصورة ورابط الانتقال للإعلان.');
+          return;
+      }
+      const adToAdd = { ...newPromoAd, id: `p${Date.now()}` };
+      setLocalSettings(prev => ({
+          ...prev,
+          promotionalAds: [...prev.promotionalAds, adToAdd]
+      }));
+      setNewPromoAd({ title: '', description: '', imageUrl: '', linkUrl: '' }); // Reset form
+  };
+
+  const handleDeletePromoAd = (id: string) => {
+      if (window.confirm('هل أنت متأكد من حذف هذا الإعلان؟')) {
+        setLocalSettings(prev => ({
+            ...prev,
+            promotionalAds: prev.promotionalAds.filter(ad => ad.id !== id)
+        }));
+      }
+  };
+
 
   const handleSave = () => {
     try {
       const parsedCategories = JSON.parse(categoriesJson);
-      const parsedPromotions = JSON.parse(promotionsJson);
-      const newSettings = { ...localSettings, categories: parsedCategories, promotionalAds: parsedPromotions };
+      const newSettings = { ...localSettings, categories: parsedCategories };
       setSettings(newSettings);
       setLocalSettings(newSettings);
       alert('تم حفظ الإعدادات بنجاح!');
       onClose();
     } catch (error) {
-      alert('خطأ في تنسيق بيانات JSON. يرجى التحقق من صحة البيانات في قسم الأقسام أو الإعلانات الترويجية.');
+      alert('خطأ في تنسيق بيانات JSON. يرجى التحقق من صحة البيانات في قسم الأقسام.');
       console.error("JSON parsing error:", error);
     }
   };
@@ -114,7 +141,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             setSettings(importedSettings);
             setLocalSettings(importedSettings);
             setCategoriesJson(JSON.stringify(importedSettings.categories, null, 2));
-            setPromotionsJson(JSON.stringify(importedSettings.promotionalAds, null, 2));
             alert('تم استيراد الإعدادات بنجاح!');
           }
         } catch (error) {
@@ -135,7 +161,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     const newSettingsObject = JSON.parse(newSettingsString);
     setLocalSettings(newSettingsObject);
     setCategoriesJson(JSON.stringify(newSettingsObject.categories, null, 2));
-    setPromotionsJson(JSON.stringify(newSettingsObject.promotionalAds, null, 2));
     alert(`تم استبدال "${findText}" بـ "${replaceText}" في جميع الإعدادات.`);
   }
 
@@ -161,7 +186,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             setSettings(data);
             setLocalSettings(data);
             setCategoriesJson(JSON.stringify(data.categories, null, 2));
-            setPromotionsJson(JSON.stringify(data.promotionalAds, null, 2));
             alert("تم تحميل الإعدادات من Gist بنجاح.");
         } else { // save
             const contentToSave = JSON.stringify(localSettings, null, 2);
@@ -189,10 +213,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   };
 
 
-  const InputField: React.FC<{label: string; value: string | number; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; placeholder?:string}> = ({label, value, onChange, type = 'text', placeholder}) => (
+  const InputField: React.FC<{label: string; value: string | number; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; placeholder?:string, name?: string}> = ({label, value, onChange, type = 'text', placeholder, name}) => (
     <div>
         <label className="block mb-1 font-semibold text-slate-300">{label}</label>
-        <input type={type} value={value} onChange={onChange} placeholder={placeholder} className="w-full p-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"/>
+        <input name={name} type={type} value={value} onChange={onChange} placeholder={placeholder} className="w-full p-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"/>
+    </div>
+  )
+  
+  const TextAreaField: React.FC<{label: string; value: string; onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void; name?: string, placeholder?: string, rows?: number}> = ({label, value, onChange, name, placeholder, rows=3}) => (
+    <div>
+        <label className="block mb-1 font-semibold text-slate-300">{label}</label>
+        <textarea name={name} value={value} onChange={onChange} placeholder={placeholder} rows={rows} className="w-full p-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"></textarea>
     </div>
   )
 
@@ -289,9 +320,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                                 <div key={part.id} className="p-3 bg-slate-900/50 rounded-md border border-slate-700">
                                     <h4 className="font-bold text-lg text-amber-400 mb-2">{part.title}</h4>
                                     <div className="space-y-2">
-                                        <InputField label="رابط المشاهدة (يوتيوب)" placeholder="https://youtube.com/..." value={part.watchUrl || ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'watchUrl', e.target.value)} />
-                                        <InputField label="رابط الإعلان النهائي" placeholder={settings.ad.url} value={part.adUrl || ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'adUrl', e.target.value)} />
-                                        <InputField label="مدة الإعلان (ثواني)" type="number" placeholder={String(settings.ad.duration)} value={part.adDuration ?? ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'adDuration', e.target.value)} />
+                                        <InputField name="watchUrl" label="رابط المشاهدة (يوتيوب)" placeholder="https://youtube.com/..." value={part.watchUrl || ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'watchUrl', e.target.value)} />
+                                        <InputField name="adUrl" label="رابط الإعلان النهائي" placeholder={settings.ad.url} value={part.adUrl || ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'adUrl', e.target.value)} />
+                                        <InputField name="adDuration" label="مدة الإعلان (ثواني)" type="number" placeholder={String(settings.ad.duration)} value={part.adDuration ?? ''} onChange={(e) => handlePartAdSettingChange(partIndex, 'adDuration', e.target.value)} />
                                     </div>
                                 </div>
                             ))}
@@ -306,6 +337,41 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                     <InputField label="أيقونة (Emoji)" value={newCategoryEmoji} onChange={(e) => setNewCategoryEmoji(e.target.value)} />
                     <button onClick={handleAddCategory} className="p-3 bg-green-600 hover:bg-green-700 rounded-md font-bold transition-colors">إضافة قسم</button>
                 </div>
+            </Section>
+            
+            <Section title="إدارة الإعلانات الترويجية">
+              <div className="space-y-6">
+                <div className="p-4 bg-slate-900/50 rounded-md border border-slate-700 space-y-3">
+                    <h4 className="text-lg font-semibold text-amber-400">إضافة إعلان جديد</h4>
+                    <p className="text-sm text-slate-400 -mt-2">بالنسبة للصور، يرجى رفعها على موقع استضافة صور (مثل imgbb.com) ولصق الرابط المباشر هنا.</p>
+                    <InputField name="title" label="العنوان" value={newPromoAd.title} onChange={handleNewPromoAdChange} />
+                    <TextAreaField name="description" label="الوصف" value={newPromoAd.description} onChange={handleNewPromoAdChange} />
+                    <InputField name="imageUrl" label="رابط الصورة" placeholder="https://example.com/image.png" value={newPromoAd.imageUrl} onChange={handleNewPromoAdChange} />
+                    <InputField name="linkUrl" label="رابط الانتقال" placeholder="https://example.com/product" value={newPromoAd.linkUrl} onChange={handleNewPromoAdChange} />
+                    <button onClick={handleAddPromoAd} className="w-full p-3 bg-sky-600 hover:bg-sky-700 rounded-md font-bold transition-colors">إضافة إعلان</button>
+                </div>
+                
+                <div className="space-y-3">
+                    <h4 className="text-lg font-semibold text-amber-400">الإعلانات الحالية</h4>
+                    {localSettings.promotionalAds.length === 0 ? (
+                        <p className="text-slate-400 bg-slate-900/50 p-4 rounded-md text-center">لا توجد إعلانات ترويجية حالياً.</p>
+                    ) : (
+                        localSettings.promotionalAds.map(ad => (
+                            <div key={ad.id} className="p-3 bg-slate-900/50 rounded-md border border-slate-700 flex items-start gap-4">
+                                <img src={ad.imageUrl} alt={ad.title} className="w-24 h-16 object-cover rounded-md flex-shrink-0 border border-slate-600" />
+                                <div className="flex-grow">
+                                    <h5 className="font-bold text-slate-200">{ad.title}</h5>
+                                    <p className="text-sm text-slate-400 mb-1">{ad.description}</p>
+                                    <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 hover:underline break-all">{ad.linkUrl}</a>
+                                </div>
+                                <button onClick={() => handleDeletePromoAd(ad.id)} className="p-2 bg-red-600/50 hover:bg-red-600 text-white rounded-full transition-colors flex-shrink-0" aria-label="حذف الإعلان">
+                                    <TrashIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+              </div>
             </Section>
 
             <Section title="معلومات المطور">
@@ -322,13 +388,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                     <label className="block mb-1 font-semibold text-slate-300">محتوى الصفحة</label>
                     <textarea value={localSettings.about.content} onChange={(e) => setLocalSettings({...localSettings, about: {...localSettings.about, content: e.target.value}})} rows={5} className="w-full p-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"></textarea>
                  </div>
-            </Section>
-            
-            <Section title="الإعلانات الترويجية (JSON)">
-                <p className="text-sm text-slate-400 mb-4">
-                    أضف أو عدّل الإعلانات التي تظهر في الصفحة الرئيسية.
-                </p>
-                <textarea dir="ltr" className="w-full h-64 p-3 bg-slate-900 border border-slate-600 rounded-md text-green-300 font-mono focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none" value={promotionsJson} onChange={(e) => setPromotionsJson(e.target.value)} />
             </Section>
             
             <Section title="الأقسام والكتب (JSON)">
