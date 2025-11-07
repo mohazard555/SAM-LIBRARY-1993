@@ -288,6 +288,120 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
         title: '', author: '', coverColor: 'bg-slate-100', categoryId: '', content: '', partTitle: 'قراءة الرواية',
     });
   };
+  
+  const handleExportSettings = () => {
+    try {
+        const settingsJson = JSON.stringify(localSettings, null, 2);
+        const blob = new Blob([settingsJson], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'library-settings.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error("Failed to export settings:", error);
+        alert("فشل تصدير الإعدادات.");
+    }
+  };
+
+  const handleImportSettings = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          try {
+              const result = event.target?.result;
+              if (typeof result === 'string') {
+                  const importedSettings = JSON.parse(result);
+                  if (importedSettings.siteName && Array.isArray(importedSettings.categories)) {
+                      setLocalSettings(importedSettings);
+                      alert("تم استيراد الإعدادات بنجاح. لا تنسَ الحفظ.");
+                  } else {
+                      throw new Error("Invalid settings file format.");
+                  }
+              }
+          } catch (error) {
+              console.error("Failed to import settings:", error);
+              alert("فشل استيراد الإعدادات. تأكد من أن الملف بصيغة JSON صحيحة.");
+          }
+      };
+      reader.readAsText(file);
+      e.target.value = ''; // Reset file input
+  };
+  
+  const handleFetchFromGist = async () => {
+      const { rawUrl } = localSettings.gistSync;
+      if (!rawUrl) {
+          alert("يرجى إدخال رابط Gist Raw URL أولاً.");
+          return;
+      }
+      try {
+          const response = await fetch(rawUrl, { cache: 'no-store' });
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json();
+          if (data.siteName && Array.isArray(data.categories)) {
+              setLocalSettings(data);
+              alert("تم جلب الإعدادات من Gist بنجاح. لا تنسَ الحفظ.");
+          } else {
+              throw new Error("Invalid settings format in Gist.");
+          }
+      } catch (error) {
+          console.error("Failed to fetch from Gist:", error);
+          alert("فشل جلب الإعدادات من Gist. تحقق من الرابط وصلاحيات الوصول.");
+      }
+  };
+
+  const handleSaveToGist = async () => {
+      const { rawUrl, token } = localSettings.gistSync;
+      if (!rawUrl || !token) {
+          alert("يرجى إدخال رابط Gist Raw URL والتوكن الشخصي.");
+          return;
+      }
+
+      const match = rawUrl.match(/gist\.githubusercontent\.com\/[^\/]+\/([a-f0-9]+)\/raw\/[^\/]+\/(.*)/);
+      if (!match) {
+          alert("صيغة Gist Raw URL غير صالحة. لا يمكن استخراج Gist ID واسم الملف.");
+          return;
+      }
+      const gistId = match[1];
+      const filename = match[2];
+
+      try {
+          const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+              method: 'PATCH',
+              headers: {
+                  'Authorization': `token ${token}`,
+                  'Accept': 'application/vnd.github.v3+json',
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  files: {
+                      [filename]: {
+                          content: JSON.stringify(localSettings, null, 2),
+                      },
+                  },
+              }),
+          });
+
+          if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(`GitHub API error: ${errorData.message}`);
+          }
+
+          alert("تم حفظ الإعدادات في Gist بنجاح!");
+
+      } catch (error) {
+          console.error("Failed to save to Gist:", error);
+          alert(`فشل الحفظ إلى Gist. تحقق من التوكن والصلاحيات. قد تكون هناك مشكلة في CORS. \n${error}`);
+      }
+  };
+
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4">
@@ -317,6 +431,38 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                         <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, (base64) => setLocalSettings(prev => ({...prev, siteLogoUrl: base64})))} className="text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-700"/>
                     </div>
                     <input type="text" placeholder="أو الصق رابط شعار هنا" value={localSettings.siteLogoUrl.startsWith('data:image') ? '' : localSettings.siteLogoUrl} onChange={(e) => handleSettingsChange(e, 'siteLogoUrl')} className="bg-slate-800 border border-slate-600 rounded-md p-2 focus:ring-sky-500 focus:border-sky-500 text-sm" />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border border-slate-700 rounded-lg">
+              <h3 className="text-xl font-bold mb-4 text-sky-400">المزامنة والنسخ الاحتياطي</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="text-lg font-semibold mb-2 text-amber-400">مزامنة Gist</h4>
+                  <div className="flex flex-col gap-3">
+                    <input type="text" placeholder="رابط Gist Raw URL" value={localSettings.gistSync.rawUrl} onChange={(e) => handleSettingsChange(e, 'gistSync', 'rawUrl')} className="bg-slate-800 border border-slate-600 rounded-md p-2"/>
+                    <input type="password" placeholder="GitHub Personal Access Token" value={localSettings.gistSync.token} onChange={(e) => handleSettingsChange(e, 'gistSync', 'token')} className="bg-slate-800 border border-slate-600 rounded-md p-2"/>
+                    <div className="flex gap-2">
+                      <button onClick={handleFetchFromGist} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">جلب من Gist</button>
+                      <button onClick={handleSaveToGist} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded transition-colors">حفظ إلى Gist</button>
+                    </div>
+                     <p className="text-xs text-slate-500">ملاحظة: يتطلب الحفظ إلى Gist توكن وصول شخصي بصلاحية 'gist'. احذر من استخدام هذه الميزة في بيئة عامة.</p>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold mb-2 text-amber-400">نسخ احتياطي محلي</h4>
+                  <div className="flex flex-col gap-3">
+                    <button onClick={handleExportSettings} className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors">
+                      تصدير الإعدادات (JSON)
+                    </button>
+                    <div>
+                      <label htmlFor="import-settings" className="w-full block text-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors cursor-pointer">
+                          استيراد الإعدادات (JSON)
+                      </label>
+                      <input id="import-settings" type="file" accept=".json" onChange={handleImportSettings} className="hidden" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -142,16 +142,34 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const storedSettings = localStorage.getItem('librarySettings');
       if (storedSettings) {
-        // A simple migration to ensure clickCount exists
         const parsed = JSON.parse(storedSettings);
-        parsed.categories.forEach((cat: any) => {
-          cat.books.forEach((book: any) => {
-            if (book.clickCount === undefined) {
-              book.clickCount = 0;
-            }
-          });
+
+        // Create a new settings object by deeply merging defaults and parsed data
+        // to ensure all keys exist and prevent crashes from outdated settings.
+        const newSettings: AppSettings = {
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          colors: { ...DEFAULT_SETTINGS.colors, ...(parsed.colors || {}) },
+          ad: { ...DEFAULT_SETTINGS.ad, ...(parsed.ad || {}) },
+          developer: { ...DEFAULT_SETTINGS.developer, ...(parsed.developer || {}) },
+          about: { ...DEFAULT_SETTINGS.about, ...(parsed.about || {}) },
+          gistSync: { ...DEFAULT_SETTINGS.gistSync, ...(parsed.gistSync || {}) },
+          categories: Array.isArray(parsed.categories) ? parsed.categories : DEFAULT_SETTINGS.categories,
+          promotionalAds: Array.isArray(parsed.promotionalAds) ? parsed.promotionalAds : DEFAULT_SETTINGS.promotionalAds,
+        };
+        
+        // Now, perform migration on the safe newSettings object
+        newSettings.categories.forEach((cat: any) => {
+          if (cat && Array.isArray(cat.books)) {
+            cat.books.forEach((book: any) => {
+              if (book && book.clickCount === undefined) {
+                book.clickCount = 0;
+              }
+            });
+          }
         });
-        return parsed;
+
+        return newSettings;
       }
       return DEFAULT_SETTINGS;
     } catch (error) {
