@@ -24,8 +24,10 @@ export interface Category {
 }
 
 export interface AdSettings {
-  url: string;
+  url: string; // Kept for fallback compatibility
   duration: number; // in seconds
+  urlList?: string[];
+  youtubeUrls?: string[];
 }
 
 export interface DeveloperInfo {

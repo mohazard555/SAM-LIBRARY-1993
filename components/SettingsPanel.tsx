@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import type { AppSettings, Book, Category, PromotionalAd } from '../types';
@@ -41,7 +40,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [newCategoryEmoji, setNewCategoryEmoji] = useState('');
 
   const [selectedBookKey, setSelectedBookKey] = useState('');
-  const [bookEditForm, setBookEditForm] = useState<{title: string; author: string; coverColor: string} | null>(null);
+  const [bookEditForm, setBookEditForm] = useState<{
+    title: string; 
+    author: string; 
+    coverColor: string;
+    partTitle: string;
+    partContent: string;
+  } | null>(null);
 
   const [newPromoAd, setNewPromoAd] = useState<Omit<PromotionalAd, 'id'>>({ title: '', description: '', imageUrl: '', linkUrl: '' });
   const [newBook, setNewBook] = useState({
@@ -62,10 +67,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
         const [catIndex, bookIndex] = selectedBookKey.split('-').map(Number);
         const book = localSettings.categories[catIndex]?.books[bookIndex];
         if (book) {
+            const firstPart = book.parts[0] || { title: '', content: '' };
             setBookEditForm({
                 title: book.title,
                 author: book.author,
-                coverColor: book.coverColor
+                coverColor: book.coverColor,
+                partTitle: firstPart.title,
+                partContent: firstPart.content,
             });
         }
     } else {
@@ -78,7 +86,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, 
     ...keys: string[]
 ) => {
-    const { value } = e.target;
+    const { value, type } = e.target;
     setLocalSettings(prev => {
         const newState = JSON.parse(JSON.stringify(prev)); // Deep copy for nested objects
         let currentLevel: any = newState;
@@ -87,7 +95,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             currentLevel = currentLevel[keys[i]];
         }
         
-        currentLevel[keys[keys.length - 1]] = value;
+        currentLevel[keys[keys.length - 1]] = type === 'number' ? parseInt(value, 10) || 0 : value;
         return newState;
     });
 };
@@ -205,7 +213,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
       }));
   };
 
-  const handleBookEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleBookEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       if (bookEditForm) {
           setBookEditForm({
               ...bookEditForm,
@@ -219,17 +227,43 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
       const [catIndex, bookIndex] = selectedBookKey.split('-').map(Number);
       
       setLocalSettings(prev => {
-        const updatedCategories = [...prev.categories];
-        const bookToUpdate = updatedCategories[catIndex].books[bookIndex];
-        
-        updatedCategories[catIndex].books[bookIndex] = {
-            ...bookToUpdate,
-            title: bookEditForm.title,
-            author: bookEditForm.author,
-            coverColor: bookEditForm.coverColor
-        };
-        return { ...prev, categories: updatedCategories };
+        const newCategories = prev.categories.map((cat, cIndex) => {
+            if (cIndex !== catIndex) return cat;
+            return {
+                ...cat,
+                books: cat.books.map((book, bIndex) => {
+                    if (bIndex !== bookIndex) return book;
+                    
+                    const updatedBook = {
+                        ...book,
+                        title: bookEditForm.title,
+                        author: bookEditForm.author,
+                        coverColor: bookEditForm.coverColor,
+                    };
+
+                    const newParts = [...(book.parts || [])];
+                    if (newParts.length > 0) {
+                        newParts[0] = {
+                            ...newParts[0],
+                            title: bookEditForm.partTitle,
+                            content: bookEditForm.partContent,
+                        };
+                    } else {
+                         newParts.push({
+                            id: `p${Date.now()}`,
+                            title: bookEditForm.partTitle,
+                            content: bookEditForm.partContent,
+                            adUrl: '',
+                        });
+                    }
+                    updatedBook.parts = newParts;
+                    return updatedBook;
+                })
+            };
+        });
+        return { ...prev, categories: newCategories };
       });
+
       alert('تم تحديث معلومات الحكاية بنجاح.');
   };
   
@@ -435,6 +469,24 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
               </div>
             </div>
 
+             <div className="p-4 border border-slate-700 rounded-lg">
+              <h3 className="text-xl font-bold mb-4 text-sky-400">إدارة الإعلانات</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="adDuration" className="text-slate-400">مدة انتظار الإعلان (ثواني)</label>
+                  <input type="number" id="adDuration" value={localSettings.ad.duration} onChange={(e) => handleSettingsChange(e, 'ad', 'duration')} className="bg-slate-800 border border-slate-600 rounded-md p-2 focus:ring-sky-500 focus:border-sky-500" />
+                </div>
+                 <div className="flex flex-col gap-2">
+                  <label htmlFor="adYoutubeUrls" className="text-slate-400">روابط فيديوهات يوتيوب (كل رابط في سطر)</label>
+                  <textarea id="adYoutubeUrls" rows={4} value={(localSettings.ad.youtubeUrls || []).join('\n')} onChange={(e) => setLocalSettings(prev => ({...prev, ad: {...prev.ad, youtubeUrls: e.target.value.split('\n')}}))} className="bg-slate-800 border border-slate-600 rounded-md p-2 focus:ring-sky-500 focus:border-sky-500 font-mono text-sm" />
+                </div>
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <label htmlFor="adRedirectUrls" className="text-slate-400">روابط الانتقال بعد المشاهدة (كل رابط في سطر)</label>
+                  <textarea id="adRedirectUrls" rows={4} value={(localSettings.ad.urlList || []).join('\n')} onChange={(e) => setLocalSettings(prev => ({...prev, ad: {...prev.ad, urlList: e.target.value.split('\n')}}))} className="bg-slate-800 border border-slate-600 rounded-md p-2 focus:ring-sky-500 focus:border-sky-500 font-mono text-sm" />
+                </div>
+              </div>
+            </div>
+
             <div className="p-4 border border-slate-700 rounded-lg">
               <h3 className="text-xl font-bold mb-4 text-sky-400">المزامنة والنسخ الاحتياطي</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -514,6 +566,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                                             <option key={color.value} value={color.value}>{color.name}</option>
                                         ))}
                                     </select>
+                                    <input type="text" name="partTitle" value={bookEditForm.partTitle} onChange={handleBookEditChange} placeholder="عنوان الجزء" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"/>
+                                    <textarea name="partContent" value={bookEditForm.partContent} onChange={handleBookEditChange} placeholder="محتوى الجزء" rows={5} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2"></textarea>
                                     <div className="flex gap-2">
                                         <button onClick={handleUpdateBook} className="flex-grow bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded transition-colors">تحديث</button>
                                         <button onClick={handleDeleteBook} className="bg-red-600 hover:bg-red-700 text-white font-bold p-2 rounded transition-colors"><TrashIcon className="w-5 h-5"/></button>

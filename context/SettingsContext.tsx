@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type { AppSettings } from '../types';
 
@@ -102,6 +101,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   ad: {
     url: "https://google.com",
     duration: 20,
+    urlList: ["https://example.com/ad1", "https://example.com/ad2"],
+    youtubeUrls: ["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://www.youtube.com/watch?v=o-YBDTqX_ZU"],
   },
   developer: {
     name: "مطور عربي",
@@ -144,8 +145,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (storedSettings) {
         const parsed = JSON.parse(storedSettings);
 
-        // Create a new settings object by deeply merging defaults and parsed data
-        // to ensure all keys exist and prevent crashes from outdated settings.
         const newSettings: AppSettings = {
           ...DEFAULT_SETTINGS,
           ...parsed,
@@ -158,7 +157,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
           promotionalAds: Array.isArray(parsed.promotionalAds) ? parsed.promotionalAds : DEFAULT_SETTINGS.promotionalAds,
         };
         
-        // Now, perform migration on the safe newSettings object
+        // Migrate legacy ad settings
+        if (newSettings.ad && newSettings.ad.url && (!newSettings.ad.urlList || newSettings.ad.urlList.length === 0)) {
+          newSettings.ad.urlList = [newSettings.ad.url];
+        }
+        if (newSettings.ad && !newSettings.ad.youtubeUrls) {
+          newSettings.ad.youtubeUrls = [];
+        }
+
+        // Migrate book click counts
         newSettings.categories.forEach((cat: any) => {
           if (cat && Array.isArray(cat.books)) {
             cat.books.forEach((book: any) => {

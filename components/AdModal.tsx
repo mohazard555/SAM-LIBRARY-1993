@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import type { ContentPart } from '../types';
 
@@ -12,11 +12,24 @@ interface AdModalProps {
 const AdModal: React.FC<AdModalProps> = ({ part, bookTitle, onClose, onAdFinished }) => {
   const { settings } = useSettings();
 
-  const adConfig = {
-    duration: part.adDuration ?? settings.ad.duration,
-    watchUrl: part.watchUrl,
-    adUrl: part.adUrl || settings.ad.url,
-  };
+  const adConfig = useMemo(() => {
+    const getRandomItem = (arr: string[] | undefined): string | undefined => {
+      if (!arr || arr.length === 0) return undefined;
+      const filteredArr = arr.filter(item => item && item.trim() !== '');
+      if (filteredArr.length === 0) return undefined;
+      return filteredArr[Math.floor(Math.random() * filteredArr.length)];
+    };
+    
+    const watchUrl = part.watchUrl || getRandomItem(settings.ad.youtubeUrls);
+    const adUrl = part.adUrl || getRandomItem(settings.ad.urlList) || settings.ad.url;
+
+    return {
+      duration: part.adDuration ?? settings.ad.duration,
+      watchUrl: watchUrl,
+      adUrl: adUrl,
+    };
+  }, [part, settings]);
+
 
   const [countdown, setCountdown] = useState(adConfig.duration);
   const [countdownStarted, setCountdownStarted] = useState(!adConfig.watchUrl);
